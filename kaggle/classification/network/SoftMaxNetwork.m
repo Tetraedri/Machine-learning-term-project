@@ -1,4 +1,4 @@
-classdef OwnNetwork
+classdef SoftMaxNetwork
     properties
         biases
         weights
@@ -9,15 +9,17 @@ classdef OwnNetwork
     methods
         
         % Initializes the network.
-        function obj = OwnNetwork(layer_sizes)
+        function obj = SoftMaxNetwork(layer_sizes)
             obj.layer_sizes = layer_sizes;
             obj.len = length(layer_sizes)-1;
-            obj.biases = cell(1, obj.len);
-            obj.weights = cell(1, obj.len);
+            obj.biases = cell(1, obj.len+1);
+            obj.weights = cell(1, obj.len+1);
             for i = 2:length(layer_sizes)
-                obj.biases{i-1} = rand(layer_sizes(i), 1)/layer_sizes(i-1);
+                obj.biases{i-1} = rand(layer_sizes(i), 1);
                 obj.weights{i-1} = rand(layer_sizes(i), layer_sizes(i-1))/layer_sizes(i-1);
             end
+            obj.biases{end} = rand(layer_sizes(i), 1);
+            obj.weights{end} = rand(layer_sizes(i))/layer_sizes(i-1);
         end
         
         % Outputs the result of an input
@@ -27,6 +29,8 @@ classdef OwnNetwork
                 z = bsxfun(@plus, obj.weights{i}*res, obj.biases{i});
                 res = sigmoid(z);
             end
+            z = bsxfun(@plus, obj.weights{end}*res, obj.biases{end});
+            res = softmax(z);
         end
         
         % Trains the neural network.
@@ -35,20 +39,22 @@ classdef OwnNetwork
             regfact = 1-lambda*eta/n;
             valerr = zeros(1, epochs);
             val_cov = validation_data(:, 1:end-obj.layer_sizes(end))';
-            val_var = validation_data(:, end-obj.layer_sizes(end)+1:end)';
+            val_var = validation_data(:, 1+end-obj.layer_sizes(end):end)';
+            
             for i = 1:epochs
                 shuffled = shuffle(training_data);
                 for j = 1:mini_batch_size:n-mini_batch_size
                     mini_batch = shuffled(j:j+mini_batch_size, :);
                     covariates = mini_batch(:, 1:end-obj.layer_sizes(end));
-                    variates = mini_batch(:, end-obj.layer_sizes(end)+1:end);
+                    variates = mini_batch(:, 1+end-obj.layer_sizes(end):end);
                     [grad_weights, grad_biases] = Backpropagate(obj, covariates', variates');
                     for k = 1:obj.len
                         obj.biases{k}  = obj.biases{k}-eta*grad_biases{k};
                         obj.weights{k} = regfact*obj.weights{k}-eta*grad_weights{k};
                     end
                 end
-                valerr(i) = mean(cost(Feedforward(obj, val_cov), val_var));
+                costvector = cost(Feedforward(obj, val_cov), val_var);
+                valerr(i) = mean(costvector(end));
             end
         end
         
@@ -56,10 +62,10 @@ classdef OwnNetwork
         function [grad_weights, grad_biases] = Backpropagate(obj, input, expected)
             n = size(expected, 2);
             
-            acts = cell(1, obj.len+1);
+            acts = cell(1, obj.len+2);
             acts{1} = input;
             
-            zs = cell(1, obj.len);
+            zs = cell(1, obj.len+1);
             
             % Feedforward
             for i = 1:obj.len  
@@ -68,19 +74,25 @@ classdef OwnNetwork
                 act = sigmoid(z);
                 acts{i+1} = act;
             end
-            grad_weights = cell(1, obj.len);
-            grad_biases = cell(1, obj.len);
+            
+            z = bsxfun(@plus, obj.weights{end}*acts{end-1}, obj.biases{end});
+            zs{end} = z;
+            act = softmax(z);
+            acts{end} = act;
+            
+            grad_weights = cell(1, obj.len+1);
+            grad_biases = cell(1, obj.len+1);
             
             % Backpropagate
             grad_biases{end} = dcost(acts{end}, expected).*dsigmoid(zs{end});
             grad_weights{end} = grad_biases{end}*acts{end-1}'/n;
             
-            for i = fliplr(1:obj.len-1)
+            for i = fliplr(1:obj.len)
                 grad_biases{i} = (obj.weights{i+1}'*grad_biases{i+1}).*dsigmoid(zs{i});
                 grad_weights{i} = grad_biases{i}*acts{i}'/n;
             end
             
-            for i = 1:obj.len
+            for i = 1:obj.len+1
                 grad_biases{i} = mean(grad_biases{i}, 2);
             end
             
@@ -98,7 +110,7 @@ end
 % Is the cost function. a is the calculated result, r is the
 % expected result.
 function res = cost(a, r)
-    res = -sum(r'.*log(a') + (1-r').*log(1-a'))/size(a,2);
+    res = -sum(r.*log(a) + (1-r).*log(1-a))/size(a,2);
 end
 
 function res = dcost(a, r)
