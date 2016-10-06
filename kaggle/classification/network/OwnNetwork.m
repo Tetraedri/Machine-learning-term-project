@@ -25,7 +25,7 @@ classdef OwnNetwork
             res = input;
             for i = 1:obj.len
                 z = bsxfun(@plus, obj.weights{i}*res, obj.biases{i});
-                res = sigmoid(z);
+                res = neurfun(z);
             end
         end
         
@@ -48,7 +48,7 @@ classdef OwnNetwork
                         obj.weights{k} = regfact*obj.weights{k}-eta*grad_weights{k};
                     end
                 end
-                valerr(i) = mean(cost(Feedforward(obj, val_cov), val_var));
+                valerr(i) = real(mean(cost(Feedforward(obj, val_cov), val_var)));
             end
         end
         
@@ -65,18 +65,18 @@ classdef OwnNetwork
             for i = 1:obj.len  
                 z = bsxfun(@plus, obj.weights{i}*acts{i}, obj.biases{i});
                 zs{i} = z;
-                act = sigmoid(z);
+                act = neurfun(z);
                 acts{i+1} = act;
             end
             grad_weights = cell(1, obj.len);
             grad_biases = cell(1, obj.len);
             
             % Backpropagate
-            grad_biases{end} = dcost(acts{end}, expected).*dsigmoid(zs{end});
+            grad_biases{end} = dcost(acts{end}, expected).*dneurfun(zs{end});
             grad_weights{end} = grad_biases{end}*acts{end-1}'/n;
             
             for i = fliplr(1:obj.len-1)
-                grad_biases{i} = (obj.weights{i+1}'*grad_biases{i+1}).*dsigmoid(zs{i});
+                grad_biases{i} = (obj.weights{i+1}'*grad_biases{i+1}).*dneurfun(zs{i});
                 grad_weights{i} = grad_biases{i}*acts{i}'/n;
             end
             
@@ -90,9 +90,16 @@ classdef OwnNetwork
     
 end
 
-% Is a derivative of sigmoid function. Duh.
-function res = dsigmoid(z)
-    res = sigmoid(z).*(1-sigmoid(z));
+function res = neurfun(z)
+    res = max(0, z);
+end
+
+% Is a derivative of neurfun function. Duh.
+function res = dneurfun(z)
+    %res = neurfun(z).*(1-neurfun(z));
+    res = z;
+    res(res<0) = 0;
+    res(res>0) = 1;
 end
 
 % Is the cost function. a is the calculated result, r is the
