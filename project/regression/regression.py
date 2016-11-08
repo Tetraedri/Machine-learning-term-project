@@ -85,14 +85,3 @@ print(model(data, test_data))
 #b = np.array([2, 2, 2, 2, 2, 2])
 
 #z = closest_k(a, b, 4)
-
-#print(z)
-#print(z[0])
-#print(z[0][0])
-#pyqt-fit attempt
-#k0 = smooth.NonParamRegression(x, y, method=npr_methods.SpatialAverage())
-#k0.fit()
-
-#Ace attempt
-#mymodel = model.Model()
-#mymodel.build_model_from_xy(x, y)
